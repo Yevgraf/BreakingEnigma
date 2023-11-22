@@ -1,168 +1,185 @@
-    package org.example;
-    import java.io.BufferedReader;
-    import java.io.FileReader;
-    import java.io.IOException;
-    import java.nio.charset.StandardCharsets;
-    import java.security.MessageDigest;
-    import java.security.NoSuchAlgorithmException;
-    import java.util.*;
+package org.example;
 
-    public class BreakingEnigma {
-        private final String alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-        private final String saltAlphabet = "!#$%&*+-:;<=>?@";
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.IOException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
-        public static void main(String[] args) {
-            BreakingEnigma enigma = new BreakingEnigma();
+public class BreakingEnigma {
 
-            // Manually setting parameters for a single test case
-            String input = "A";
-            String salt = ".";
-            int saltMode = 1;
-            int rotation = 23;
-            int increment = 23;
-            String alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-            String plugboard = "{'B': 'P', 'K': 'U', 'O': 'J', 'S': 'F', 'I': 'X', 'N': 'R', 'H': 'Y', 'V': 'A', 'E': 'Q', 'T': 'D', 'C': 'Z', 'W': 'M'}";
-            String expectedResult = "X"; // The expected decrypted result
+    private static String hash;
+    private static Map<String, String> plugboard = new HashMap<>();
+    private static String password;
+    private static List<String> wordlist;
+    private static int attempts = 0;
+    private static final String enigmaAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
-            String decryptedWord = enigma.decryptHash(input, salt, saltMode, rotation, increment, alphabet, plugboard);
+    public static void main(String[] args) {
+        // Hardcoded plugboard configuration and hash
+        hash = "6e8c4b3a71543af80890dd501a70e030f0a1f867631175f7440a4599041d52e3";
+        plugboard.put("N", "Q");
+        plugboard.put("S", "B");
+        plugboard.put("X", "W");
+        plugboard.put("T", "G");
+        plugboard.put("R", "D");
+        plugboard.put("J", "C");
+        plugboard.put("F", "O");
+        plugboard.put("V", "I");
+        plugboard.put("L", "P");
+        plugboard.put("H", "Y");
 
-            // Check if the decryption result matches the expected result
-            if (decryptedWord != null && decryptedWord.equals(expectedResult)) {
-                System.out.println("Test case passed for input: " + input);
-            } else {
-                System.out.println("Test case failed for input: " + input);
-            }
-        }
+        // Load wordlist from file - you need to provide your wordlist data here
+        // For now, I'll just initialize an empty list
+        wordlist = new ArrayList<>();
 
+        int rot = -1;
 
+        long startTime = System.currentTimeMillis(); // Start time measurement
 
-        private static Map<Character, Character> parsePlugboardMapping(String input) {
-            Map<Character, Character> mapping = new HashMap<>();
-            input = input.replaceAll("[{}'\\s]", "");
+        while (!passwordFound()) {
+            rot++;
+            System.out.println("Rot " + rot);
 
-            for (String pair : input.split(",")) {
-                String[] keyValue = pair.split(":");
-                char key = keyValue[0].charAt(0);
-                char value = keyValue[1].charAt(0);
-                mapping.put(key, value);
-            }
+            for (String word : wordlist) {
+                String plugWord = convertWordToPlugboard(word);
 
-            return mapping;
-        }
+                if (passwordFound()) break;
 
-        public String decryptHash(String input, String salt, int saltMode, int rotation, int increment, String alphabet, String plugboard) {
-            try {
-                List<String> saltCombinations = generateSaltCombinations();
+                for (char firstSaltChar : "!#$%&*+-:;<=>?@".toCharArray()) {
+                    for (char secondSaltChar : "!#$%&*+-:;<=>?@".toCharArray()) {
+                        String salt = convertWordToPlugboard(String.valueOf(firstSaltChar) + secondSaltChar);
 
-                for (String saltCombination : saltCombinations) {
-                    String saltedFrontWord = saltCombination + input;
-                    String saltedBackWord = input + saltCombination;
+                        for (int f = 0; f < plugWord.length() + 2; f++) {
+                            String passwordHash = enhancedCaesar(plugWord, salt, rot, f);
 
-                    String plugBoardedFrontWord = applyPlugboardMapping(saltedFrontWord, parsePlugboardMapping(plugboard));
-                    String plugBoardedBackWord = applyPlugboardMapping(saltedBackWord, parsePlugboardMapping(plugboard));
-
-                    for (int incrementFactor = 0; incrementFactor < 6; incrementFactor++) {
-                        int rotationValue = (6 * incrementFactor + rotation) % 26;
-
-                        String translatedFrontWord = translate(plugBoardedFrontWord, incrementFactor, rotationValue, salt, saltMode);
-                        String translatedBackWord = translate(plugBoardedBackWord, incrementFactor, rotationValue, salt, saltMode);
-
-                        String hashedFrontWord = calculateSHA512(translatedFrontWord);
-                        String hashedBackWord = calculateSHA512(translatedBackWord);
-
-                        if (hashedFrontWord.equalsIgnoreCase(input) || hashedBackWord.equalsIgnoreCase(input)) {
-                            return input;
+                            if (passwordHash != null) {
+                                password = word;
+                                break;
+                            }
                         }
+
+                        if (passwordFound()) break;
                     }
+
+                    if (passwordFound()) break;
                 }
-                System.out.println("No match found.");
-            } catch (Exception e) {
-                throw new RuntimeException(e);
+
+                if (passwordFound()) break;
             }
+        }
+
+        long endTime = System.currentTimeMillis(); // End time measurement
+
+        System.out.println(passwordFound()
+                ? "The password is " + password
+                : "Password not found");
+
+        System.out.println(attempts + " attempts in " + (endTime - startTime) + " milliseconds");
+    }
+
+    private static void readWordlist(String filePath) {
+        try {
+            BufferedReader reader = new BufferedReader(new FileReader(filePath));
+            List<String> words = new ArrayList<>();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                words.add(line.trim());
+            }
+            reader.close();
+            wordlist = words;
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+
+    private static void parsePlugboard(String config) {
+        // Parse the plugboard configuration provided as a string argument
+        // Assuming the format is like {'N':'Q','S':'B',...}
+        config = config.substring(1, config.length() - 1).replace("'", "").replace(" ", "");
+        String[] pairs = config.split(",");
+        for (String pair : pairs) {
+            String[] keyValue = pair.split(":");
+            plugboard.put(keyValue[0], keyValue[1]);
+        }
+    }
+
+        private static String convertWordToPlugboard(String word) {
+            StringBuilder plugWord = new StringBuilder();
+            for (char w : word.toCharArray()) {
+                String plugboardChar = plugboard.getOrDefault(String.valueOf(w), String.valueOf(w));
+                plugWord.append(plugboardChar);
+            }
+            return plugWord.toString();
+        }
+
+        private static String enhancedCaesar(String plugWord, String salt, int rot, int f) {
+            String calculatedWord, hash = "";
+
+            calculatedWord = enhancedCaesarCalculator(salt + plugWord, rot, f);
+            calculatedWord = convertWordToPlugboard(calculatedWord);
+            hash = convertWordToSha512(calculatedWord);
+
+            if (hash.equals(BreakingEnigma.hash)) {
+                return hash;
+            }
+
+            calculatedWord = enhancedCaesarCalculator(plugWord + salt, rot, f);
+            calculatedWord = convertWordToPlugboard(calculatedWord);
+            hash = convertWordToSha512(calculatedWord);
+
+            if (hash.equals(BreakingEnigma.hash)) {
+                return hash;
+            }
+
             return null;
         }
 
+    private static String enhancedCaesarCalculator(String word, int rot, int f) {
+        StringBuilder calculatedWord = new StringBuilder();
 
-        private List<String> generateSaltCombinations() {
-            List<String> combinations = new ArrayList<>();
-            for (char firstSaltChar : saltAlphabet.toCharArray()) {
-                for (char secondSaltChar : saltAlphabet.toCharArray()) {
-                    combinations.add(String.valueOf(firstSaltChar) + secondSaltChar);
-                }
-            }
-            return combinations;
+        for (int i = 0; i < word.length(); i++) {
+            attempts++;
+            char currChar = word.charAt(i);
+            int inc = i * f;
+
+            // Calculate the new character position without using enigmaLongAlphabet
+            int charPosition = enigmaAlphabet.indexOf(currChar);
+            int newPosition = (charPosition + rot + inc) % enigmaAlphabet.length();
+
+            char newChar = enigmaAlphabet.charAt(newPosition);
+            calculatedWord.append(newChar);
         }
 
-        private String applyPlugboardMapping(String word, Map<Character, Character> plugboardMapping) {
-            StringBuilder mappedWord = new StringBuilder();
+        return calculatedWord.toString();
+    }
 
-            for (int i = 0; i < word.length(); i++) {
-                char currentChar = word.charAt(i);
-                char mappedChar = plugboardMapping.getOrDefault(currentChar, currentChar);
-                mappedWord.append(mappedChar);
-            }
 
-            return mappedWord.toString();
-        }
-
-        private String calculateSHA512(String wordForHashing) {
-            StringBuilder sb = new StringBuilder();
+    private static String convertWordToSha512(String word) {
             try {
-                MessageDigest md = MessageDigest.getInstance("SHA-512");
-                byte[] data = md.digest(wordForHashing.getBytes(StandardCharsets.UTF_8));
-                for (byte datum : data) {
-                    sb.append(String.format("%02x", datum));
+                MessageDigest digest = MessageDigest.getInstance("SHA-512");
+                byte[] hashBytes = digest.digest(word.getBytes());
+                StringBuilder hexString = new StringBuilder();
+
+                for (byte hashByte : hashBytes) {
+                    String hex = Integer.toHexString(0xff & hashByte);
+                    if (hex.length() == 1) hexString.append('0');
+                    hexString.append(hex);
                 }
+
+                return hexString.toString().toLowerCase();
             } catch (NoSuchAlgorithmException e) {
-                throw new RuntimeException("Error generating hash: " + e.getMessage());
+                e.printStackTrace();
             }
-            return sb.toString();
+            return "";
         }
 
-        private String translate(String word, int incrementFactor, int rotation, String salt, int saltMode) {
-            StringBuilder translatedWord = new StringBuilder();
-            int currentIndex = 0;
-
-            for (char wordChar : word.toCharArray()) {
-                int inc = currentIndex * incrementFactor;
-
-                if (saltAlphabet.indexOf(wordChar) != -1) {
-                    int saltIndex = saltAlphabet.indexOf(wordChar);
-                    int rotatedSaltIndex = (saltIndex + rotation + inc) % saltAlphabet.length();
-                    if (rotatedSaltIndex < 0) {
-                        rotatedSaltIndex += saltAlphabet.length();
-                    }
-                    char newSaltChar = saltAlphabet.charAt(rotatedSaltIndex);
-                    translatedWord.append(newSaltChar);
-                } else {
-                    if (!Character.isLetter(wordChar)) {
-                        translatedWord.append(wordChar); // Keep non-letter characters as is
-                        continue;
-                    }
-
-                    int indexOfChar = alphabet.indexOf(Character.toUpperCase(wordChar));
-
-                    if (indexOfChar == -1) continue;
-
-                    int saltIndex = currentIndex % salt.length();
-                    char currentSaltChar = salt.charAt(saltIndex);
-                    int saltRotation = saltAlphabet.indexOf(currentSaltChar) * saltMode;
-
-                    indexOfChar = (indexOfChar + rotation + inc + saltRotation) % alphabet.length();
-
-                    if (indexOfChar < 0) {
-                        indexOfChar += alphabet.length();
-                    }
-
-                    char newCharacter = alphabet.charAt(indexOfChar);
-                    if (Character.isLowerCase(wordChar)) {
-                        newCharacter = Character.toLowerCase(newCharacter); // Preserve lowercase
-                    }
-                    translatedWord.append(newCharacter);
-                    currentIndex++;
-                }
-            }
-
-            return translatedWord.toString();
+        private static boolean passwordFound() {
+            return password != null && !password.isEmpty();
         }
     }
