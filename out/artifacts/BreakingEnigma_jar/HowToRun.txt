@@ -1,0 +1,1 @@
+java -jar BreakingEnigma.jar 6e8c4b3a71543af80890dd501a70e030f0a1f867631175f7440a4599041d52e3 "{'N': 'Q', 'S': 'B', 'X': 'W', 'T': 'G', 'R': 'D', 'J': 'C', 'F': 'O', 'V': 'I', 'L': 'P', 'H': 'Y'}" ./wordlist.txt
