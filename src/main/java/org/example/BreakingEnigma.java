@@ -11,36 +11,28 @@ import java.util.Map;
 public class BreakingEnigma {
 
     private static String hash;
-    private static Map<String, String> plugboard = new HashMap<>();
+    private static final Map<String, String> plugboard = new HashMap<>();
     private static String decryptionResult;
-    private static List<String> wordlist;
     private static final String enigmaAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
     public static void main(String[] args) throws IOException {
-        // Hardcoded plugboard configuration and hash
-        hash = "6e8c4b3a71543af80890dd501a70e030f0a1f867631175f7440a4599041d52e3";
-        // Add plugboard configurations
-        plugboard.put("N", "Q");
-        plugboard.put("S", "B");
-        plugboard.put("X", "W");
-        plugboard.put("T", "G");
-        plugboard.put("R", "D");
-        plugboard.put("J", "C");
-        plugboard.put("F", "O");
-        plugboard.put("V", "I");
-        plugboard.put("L", "P");
-        plugboard.put("H", "Y");
+        if (args.length < 3) {
+            System.out.println("Usage: java -jar BreakingEnigma.jar <hash> <plugboard_config> <wordlist_filepath>");
+            System.out.println("Example: java -jar BreakingEnigma.jar 6e8c4b3a71543af80890dd501a70e030f0a1f867631175f7440a4599041d52e3 \"{'N': 'Q', 'S': 'B', 'X': 'W', 'T': 'G', 'R': 'D', 'J': 'C', 'F': 'O', 'V': 'I', 'L': 'P', 'H': 'Y'}\" ./wordlist.txt");
+            return;
+        }
 
-        String wordlistFilePath = "/home/yeev/IdeaProjects/BreakingEnigma/src/main/resources/wordlist.txt";
-        wordlist = readWordlist(wordlistFilePath);
+        hash = args[0];
+        parsePlugboardConfig(args[1]);
+        String wordlistFilePath = args[2];
+        List<String> wordlist = readWordlist(wordlistFilePath);
 
-        int rot = -1;
+
+        int rot = 1;
         while (!passwordFound()) {
             rot++;
-
             for (String word : wordlist) {
                 String plugWord = convertWordToPlugboard(word);
-                System.out.println("Word: " + word + "     Converted: " + plugWord);
 
                 if (passwordFound()) break;
 
@@ -49,12 +41,12 @@ public class BreakingEnigma {
                         String salt = convertWordToPlugboard(String.valueOf(firstSaltChar) + secondSaltChar);
                         System.out.println("Salt: " + salt + "    Rotation: " + rot + "    Word: " + word);
 
-                        for (int f = 0; f < plugWord.length() + 2; f++) {
+                        for (int f = 0; f < plugWord.length() ; f++) {
                             String passwordHash = enhancedCaesar(plugWord, salt, rot, f);
 
                             if (passwordFound(passwordHash)) {
                                 decryptionResult = word;
-                                System.out.println("Password Found: " + word + "    Salt: " + salt + "    Rotation: " + rot);
+                                System.out.println("Password Found: " + word + "    Salt: " + salt + "    Rotation: " + rot + "    Hash: " + passwordHash);
                                 break;
                             }
                         }
@@ -69,10 +61,28 @@ public class BreakingEnigma {
             }
         }
 
-        System.out.println(passwordFound()
-                ? "Found: " + decryptionResult
-                : "Not found");
+        System.out.println("Found: " + decryptionResult);
     }
+
+    private static void parsePlugboardConfig(String plugboardConfig) {
+        plugboardConfig = plugboardConfig.substring(1, plugboardConfig.length() - 1);
+        String[] pairs = plugboardConfig.split(", ");
+        for (String pair : pairs) {
+            String[] keyValue = pair.split(": ");
+            String key = keyValue[0].replaceAll("'", "");
+            String value = keyValue[1].replaceAll("'", "");
+            plugboard.put(key, value);
+        }
+    }
+
+  /*  private static void printPlugboard() {
+        System.out.println("Plugboard Configuration:");
+        for (Map.Entry<String, String> entry : plugboard.entrySet()) {
+            System.out.println(entry.getKey() + " -> " + entry.getValue());
+        }
+        System.exit(0);
+    } */
+
 
     private static List<String> readWordlist(String filePath) throws IOException {
         List<String> words = new ArrayList<>();
@@ -95,7 +105,6 @@ public class BreakingEnigma {
 
     private static String convertWordToSha256(String word) {
         try {
-            // SHA-256 hashing algorithm implemented without using java.security.MessageDigest
             java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
             byte[] hashBytes = digest.digest(word.getBytes());
             StringBuilder hexString = new StringBuilder();
@@ -110,6 +119,7 @@ public class BreakingEnigma {
         }
         return null;
     }
+
     private static String convertWordToPlugboard(String word) {
         StringBuilder plugWord = new StringBuilder();
         for (char w : word.toCharArray()) {
@@ -122,7 +132,7 @@ public class BreakingEnigma {
     private static String enhancedCaesar(String word, String salt, int rot, int f) {
         String calculatedWord;
 
-        // Attempt 1: Salt in front of the word
+        // Attempt with salt in front of the word
         calculatedWord = enhancedCaesarCalculator(salt + word, rot, f);
         calculatedWord = convertWordToPlugboard(calculatedWord);
 
@@ -131,7 +141,7 @@ public class BreakingEnigma {
             return hash;
         }
 
-        // Attempt 2: Salt at the end of the word
+        // Attempt with salt at the end of the word
         calculatedWord = enhancedCaesarCalculator(word + salt, rot, f);
         calculatedWord = convertWordToPlugboard(calculatedWord);
 
@@ -149,7 +159,7 @@ public class BreakingEnigma {
         for (int i = 0; i < word.length(); i++) {
             char currChar = word.charAt(i);
             int currIndex = enigmaAlphabet.indexOf(currChar);
-            
+
             if (currIndex == -1) {
                 calculatedWord.append(currChar);
                 continue;
