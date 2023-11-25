@@ -61,7 +61,6 @@ public class BreakingEnigma {
             }
         }
 
-        System.out.println("Found: " + decryptionResult);
     }
 
     private static void parsePlugboardConfig(String plugboardConfig) {
