@@ -28,7 +28,7 @@ public class BreakingEnigma {
         List<String> wordlist = readWordlist(wordlistFilePath);
 
 
-        int rot = 1;
+        int rot = -1;
         while (!passwordFound()) {
             rot++;
             for (String word : wordlist) {
