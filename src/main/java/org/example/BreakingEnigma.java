@@ -25,6 +25,12 @@ public class BreakingEnigma {
         hash = args[0];
         parsePlugboardConfig(args[1]);
         String wordlistFilePath = args[2];
+
+        if (!isValidHash(hash)) {
+            System.out.println("Invalid hash format.");
+            return;
+        }
+
         List<String> wordlist = readWordlist(wordlistFilePath);
 
 
@@ -63,6 +69,10 @@ public class BreakingEnigma {
 
     }
 
+    private static boolean isValidHash(String hash) {
+        // Verifica se o hash tem exatamente 64 caracteres hexadecimais
+        return hash.matches("[0-9a-fA-F]{64}");
+    }
     private static void parsePlugboardConfig(String plugboardConfig) {
         plugboardConfig = plugboardConfig.substring(1, plugboardConfig.length() - 1);
         String[] pairs = plugboardConfig.split(", ");
